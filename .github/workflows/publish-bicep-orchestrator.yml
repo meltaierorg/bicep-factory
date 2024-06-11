@@ -1,0 +1,103 @@
+---
+run-name: Publish Bicep Orchestration Module for ${{ inputs.Context }}
+name: Bicep Orchestrator Module Publishing Github Workflow.
+permissions:
+      id-token: write
+      contents: read
+      
+on:
+  workflow_dispatch:
+    inputs:
+      useLatestTag:
+        description: 'Use Latest Tag'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+      Context:
+        description: 'Select Bicep Orchestrator Folder and Name'
+        required: true
+        default: 'classic-azure-infra'
+        type: choice
+        options:
+          - 'classic-az-infra'
+
+      
+      azureContainerRegistry:
+        description: 'Select Name of Azure Container Registry where Orchestrator Modules will be published.'
+        required: true
+        default: 'bicepfactory'
+        type: choice
+        options:
+          - 'bicepfactory'
+
+
+jobs:
+
+  Validate:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout Repo
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      # Login using OIDC Creds
+      - name: OIDC Login 
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.DEFAULT_SUBSCRIPTION_ID }} 
+          enable-AzPSSession: true
+
+      # Validate Deployment
+      - name: Build ARM Template to Validate Module ${{ inputs.Context }}
+        uses: Azure/cli@v2
+        with:
+          inlineScript: |
+            pwd
+            ls -lrt
+            az account show --query name -o tsv
+            az bicep build --file  src/${{ inputs.Context }}/main.bicep 
+
+  Publish:
+    runs-on: ubuntu-latest
+    needs: Validate
+    steps:
+      # Checkout Repo
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      # Login using OIDC Creds
+      - name: OIDC Login 
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.DEFAULT_SUBSCRIPTION_ID }} 
+          enable-AzPSSession: true
+
+
+      - name: Publish Bicep Module for ${{ inputs.Context }} with Latest tag
+        uses: Azure/cli@v2
+        with:
+          inlineScript: |
+            pwd
+            ls -lrt
+            az account show --query name -o tsv
+            echo  'USER-DEFINED PIPELINE PARAMS'
+            echo orchestratorFolder: ${{ inputs.orchestratorFolder }}
+            echo Context: ${{ inputs.Context }}
+            echo azureContainerRegistry: ${{ inputs.azureContainerRegistry }}
+            echo -e 'Logging in to ACR: ${{ inputs.azureContainerRegistry }} \n'
+            echo -e 'Publishing  ${{ inputs.Context }} under latest tag \n'
+            az bicep publish --file src/${{ inputs.Context }}/main.bicep --target br:${{ inputs.azureContainerRegistry }}.azurecr.io/bicep/${{ inputs.Context }}:latest --force

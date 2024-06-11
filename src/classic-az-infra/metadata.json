@@ -1,0 +1,5 @@
+{
+    "itemDisplayName": "az-infra",
+    "description": "Orchestration module for Corp Landing Zone.",
+    "summary": "Summary describing the Bicep template."
+  }
